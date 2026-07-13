@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthScan AI - Stress Detector</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#D32F2F">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>TruthScan AI</h1>
+            <p>Stress Level Detector - صرف تفریح کے لیے</p>
+        </header>
+
+        <div id="disclaimer">
+            <b>نوٹ:</b> یہ ایپ عدالت میں ثبوت نہیں ہے۔ یہ صرف Stress چیک کرتی ہے۔
+        </div>
+
+        <div class="camera-box">
+            <video id="video" autoplay muted playsinline></video>
+        </div>
+
+        <div id="result-box">
+            <h2 id="status">اسکین شروع کریں</h2>
+            <div class="meter">
+                <div id="meter-fill"></div>
+            </div>
+            <p id="score">Stress: 0%</p>
+            <div id="light" class="light-off"></div>
+        </div>
+
+        <div class="buttons">
+            <button id="startBtn" onclick="startTest()">ٹیسٹ شروع کریں</button>
+            <button id="stopBtn" onclick="stopTest()" class="hidden">ٹیسٹ روکیں</button>
+            <button onclick="showHistory()">پچھلے رزلٹ دیکھیں</button>
+        </div>
+
+        <div id="history" class="hidden">
+            <h3>پچھلے رزلٹ</h3>
+            <div id="history-list"></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
