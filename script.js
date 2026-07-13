@@ -4,15 +4,23 @@ let stressScore = 0;
 let mediaRecorder;
 let recordedChunks = [];
 let stream;
+let errorP = document.getElementById('error');
 
 async function startTest(){
+    errorP.innerText = "";
     document.getElementById('startBtn').classList.add('hidden');
     document.getElementById('stopBtn').classList.remove('hidden');
     document.getElementById('status').innerText = "ریکارڈنگ ہو رہی ہے... بولیں";
 
-    // Camera + Mic دونوں ON
-    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    video.srcObject = stream;
+    try {
+        // Camera + Mic دونوں ON
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        video.srcObject = stream;
+    } catch(err){
+        errorP.innerText = "Error: کیمرہ/مائک کی اجازت دیں۔ Settings > Site Settings > Camera Allow کریں";
+        console.log(err);
+        return;
+    }
 
     // 1. Video Recording شروع
     recordedChunks = [];
@@ -28,7 +36,6 @@ async function startTest(){
 
 function scanLoop(){
     if(!isScanning) return;
-    // Fake HR + Voice Stress Simulation
     stressScore = Math.min(100, Math.max(0, 30 + Math.random() * 60));
     updateUI();
     setTimeout(scanLoop, 600);
@@ -55,28 +62,22 @@ function updateUI(){
 
 function stopTest(){
     isScanning = false;
-    mediaRecorder.stop();
-    stream.getTracks().forEach(track => track.stop());
+    if(mediaRecorder) mediaRecorder.stop();
+    if(stream) stream.getTracks().forEach(track => track.stop());
     document.getElementById('startBtn').classList.remove('hidden');
     document.getElementById('stopBtn').classList.add('hidden');
     document.getElementById('status').innerText = "ٹیسٹ مکمل۔ رزلٹ سیو ہو گیا";
 }
 
-// 3. Result Save کرنا
 function saveResult(){
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const videoURL = URL.createObjectURL(blob);
     const timestamp = new Date().toLocaleString('ur-PK');
 
     let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
-    history.push({
-        date: timestamp,
-        score: stressScore.toFixed(0),
-        video: videoURL
-    });
+    history.push({ date: timestamp, score: stressScore.toFixed(0), video: videoURL });
     localStorage.setItem('truthscan_history', JSON.stringify(history));
     
-    // ویڈیو ڈاؤنلوڈ بھی کر دیں
     const a = document.createElement('a');
     a.href = videoURL;
     a.download = `TruthScan_${Date.now()}.webm`;
