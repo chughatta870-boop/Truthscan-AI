@@ -17,8 +17,10 @@ async function startTest(){
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         video.srcObject = stream;
     } catch(err){
-        errorP.innerText = "Error: کیمرہ/مائک کی اجازت دیں۔ Settings > Site Settings > Camera Allow کریں";
+        errorP.innerText = "Error: کیمرہ/مائک کی اجازت دیں۔ لاک 🔒 > Site Settings > Allow کریں";
         console.log(err);
+        document.getElementById('startBtn').classList.remove('hidden');
+        document.getElementById('stopBtn').classList.add('hidden');
         return;
     }
 
@@ -36,6 +38,7 @@ async function startTest(){
 
 function scanLoop(){
     if(!isScanning) return;
+    // Fake HR + Voice Stress Simulation
     stressScore = Math.min(100, Math.max(0, 30 + Math.random() * 60));
     updateUI();
     setTimeout(scanLoop, 600);
@@ -62,25 +65,33 @@ function updateUI(){
 
 function stopTest(){
     isScanning = false;
-    if(mediaRecorder) mediaRecorder.stop();
+    if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     if(stream) stream.getTracks().forEach(track => track.stop());
     document.getElementById('startBtn').classList.remove('hidden');
     document.getElementById('stopBtn').classList.add('hidden');
     document.getElementById('status').innerText = "ٹیسٹ مکمل۔ رزلٹ سیو ہو گیا";
 }
 
+// Result Save کرنا
 function saveResult(){
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const videoURL = URL.createObjectURL(blob);
     const timestamp = new Date().toLocaleString('ur-PK');
+    const id = Date.now();
 
     let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
-    history.push({ date: timestamp, score: stressScore.toFixed(0), video: videoURL });
+    history.push({
+        id: id,
+        date: timestamp,
+        score: stressScore.toFixed(0),
+        video: videoURL
+    });
     localStorage.setItem('truthscan_history', JSON.stringify(history));
     
+    // ویڈیو ڈاؤنلوڈ بھی کر دیں
     const a = document.createElement('a');
     a.href = videoURL;
-    a.download = `TruthScan_${Date.now()}.webm`;
+    a.download = `TruthScan_${id}.webm`;
     a.click();
 }
 
@@ -101,12 +112,24 @@ function showHistory(){
             <div class="history-item">
                 <p><b>تاریخ:</b> ${item.date}</p>
                 <p><b>Stress:</b> ${item.score}%</p>
-                <video src="${item.video}" controls width="100%"></video>
+                <video src="${item.video}" controls></video>
+                <button class="deleteBtn" onclick="deleteItem(${item.id})">یہ ریکارڈ ڈیلیٹ کریں</button>
             </div>
         `;
     });
 }
 
+// نیا Delete فنکشن
+function deleteItem(id){
+    if(confirm("کیا آپ یہ ریکارڈ ڈیلیٹ کرنا چاہتے ہیں؟")){
+        let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
+        history = history.filter(item => item.id !== id);
+        localStorage.setItem('truthscan_history', JSON.stringify(history));
+        showHistory(); // لسٹ ریفریش کر دو
+    }
+}
+
+// PWA Service Worker
 if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js');
-}
+        }
