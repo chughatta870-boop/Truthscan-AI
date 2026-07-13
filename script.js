@@ -6,44 +6,79 @@ let recordedChunks = [];
 let stream;
 let errorP = document.getElementById('error');
 
+// 1. ٹیسٹ شروع کریں بٹن
 async function startTest(){
     errorP.innerText = "";
     document.getElementById('startBtn').classList.add('hidden');
     document.getElementById('stopBtn').classList.remove('hidden');
     document.getElementById('status').innerText = "ریکارڈنگ ہو رہی ہے... بولیں";
 
-    try {
-        // Camera + Mic دونوں ON
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        video.srcObject = stream;
-    } catch(err){
-        errorP.innerText = "Error: کیمرہ/مائک کی اجازت دیں۔ لاک 🔒 > Site Settings > Allow کریں";
-        console.log(err);
-        document.getElementById('startBtn').classList.remove('hidden');
-        document.getElementById('stopBtn').classList.add('hidden');
+    // چیک کریں براؤزر سپورٹ کرتا ہے یا نہیں
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        errorP.innerText = "Error: آپ کا براؤزر کیمرہ سپورٹ نہیں کرتا۔ Chrome استعمال کریں";
+        resetButtons();
         return;
     }
 
-    // 1. Video Recording شروع
-    recordedChunks = [];
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-    mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
-    mediaRecorder.onstop = saveResult;
-    mediaRecorder.start();
+    try {
+        // Camera + Mic کی Permission مانگیں
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "user" }, 
+            audio: true 
+        });
+        video.srcObject = stream;
+        video.play();
+    } catch(err){
+        console.log(err);
+        // مختلف Errors کا حل
+        if(err.name === "NotAllowedError" || err.name === "PermissionDeniedError"){
+            errorP.innerText = "Error: اجازت نہیں ملی۔ 3 ڈاٹ ⋮ > Site Settings > Camera + Mic Allow کریں پھر Refresh کریں";
+        } else if(err.name === "NotFoundError"){
+            errorP.innerText = "Error: موبائل میں کیمرہ/مائک نہیں ملا";
+        } else if(err.name === "NotReadableError"){
+            errorP.innerText = "Error: کوئی اور ایپ کیمرہ استعمال کر رہی ہے۔ اسے بند کریں";
+        } else {
+            errorP.innerText = "Error: " + err.message;
+        }
+        resetButtons();
+        return;
+    }
 
-    // 2. Stress Scan شروع
+    // 2. Video Recording شروع
+    recordedChunks = [];
+    try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    } catch(e) {
+        mediaRecorder = new MediaRecorder(stream); // اگر webm سپورٹ نہ ہو
+    }
+    
+    mediaRecorder.ondataavailable = e => {
+        if(e.data.size > 0) recordedChunks.push(e.data);
+    };
+    mediaRecorder.onstop = saveResult;
+    mediaRecorder.start(100); // ہر 100ms پر data لیتے رہو
+
+    // 3. Stress Scan شروع
     isScanning = true;
     scanLoop();
 }
 
+// بٹن ریسیٹ کرنے کے لیے
+function resetButtons(){
+    document.getElementById('startBtn').classList.remove('hidden');
+    document.getElementById('stopBtn').classList.add('hidden');
+}
+
+// 4. Fake Stress Loop
 function scanLoop(){
     if(!isScanning) return;
-    // Fake HR + Voice Stress Simulation
+    // 30 سے 90 کے درمیان Random Stress
     stressScore = Math.min(100, Math.max(0, 30 + Math.random() * 60));
     updateUI();
     setTimeout(scanLoop, 600);
 }
 
+// 5. UI Update کریں
 function updateUI(){
     document.getElementById('score').innerText = `Stress: ${stressScore.toFixed(0)}%`;
     document.getElementById('meter-fill').style.width = stressScore + '%';
@@ -63,73 +98,16 @@ function updateUI(){
     }
 }
 
+// 6. ٹیسٹ روکیں بٹن
 function stopTest(){
     isScanning = false;
     if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     if(stream) stream.getTracks().forEach(track => track.stop());
-    document.getElementById('startBtn').classList.remove('hidden');
-    document.getElementById('stopBtn').classList.add('hidden');
+    resetButtons();
     document.getElementById('status').innerText = "ٹیسٹ مکمل۔ رزلٹ سیو ہو گیا";
 }
 
-// Result Save کرنا
+// 7. Result Save کرنا + Download
 function saveResult(){
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    const videoURL = URL.createObjectURL(blob);
-    const timestamp = new Date().toLocaleString('ur-PK');
-    const id = Date.now();
-
-    let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
-    history.push({
-        id: id,
-        date: timestamp,
-        score: stressScore.toFixed(0),
-        video: videoURL
-    });
-    localStorage.setItem('truthscan_history', JSON.stringify(history));
-    
-    // ویڈیو ڈاؤنلوڈ بھی کر دیں
-    const a = document.createElement('a');
-    a.href = videoURL;
-    a.download = `TruthScan_${id}.webm`;
-    a.click();
-}
-
-function showHistory(){
-    let historyDiv = document.getElementById('history');
-    let listDiv = document.getElementById('history-list');
-    historyDiv.classList.toggle('hidden');
-    
-    let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
-    if(history.length === 0){
-        listDiv.innerHTML = "<p>کوئی رزلٹ نہیں</p>";
-        return;
-    }
-    
-    listDiv.innerHTML = '';
-    history.reverse().forEach(item => {
-        listDiv.innerHTML += `
-            <div class="history-item">
-                <p><b>تاریخ:</b> ${item.date}</p>
-                <p><b>Stress:</b> ${item.score}%</p>
-                <video src="${item.video}" controls></video>
-                <button class="deleteBtn" onclick="deleteItem(${item.id})">یہ ریکارڈ ڈیلیٹ کریں</button>
-            </div>
-        `;
-    });
-}
-
-// نیا Delete فنکشن
-function deleteItem(id){
-    if(confirm("کیا آپ یہ ریکارڈ ڈیلیٹ کرنا چاہتے ہیں؟")){
-        let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
-        history = history.filter(item => item.id !== id);
-        localStorage.setItem('truthscan_history', JSON.stringify(history));
-        showHistory(); // لسٹ ریفریش کر دو
-    }
-}
-
-// PWA Service Worker
-if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js');
-        }
+    const videoURL = URL.createObject
