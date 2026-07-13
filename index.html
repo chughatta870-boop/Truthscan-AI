@@ -4,46 +4,129 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TruthScan AI - Stress Detector</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Arial',sans-serif}
+        body{background:#1a1a1a;color:white;text-align:center}
+        .container{max-width:500px;margin:0 auto;padding:15px}
+        header{background:#D32F2F;padding:15px;border-radius:15px;margin-bottom:15px}
+        #disclaimer{background:#FFEB3B;color:black;padding:10px;border-radius:8px;font-size:12px;margin-bottom:15px;font-weight:bold}
+        .camera-box video{width:100%;border-radius:15px;border:3px solid #D32F2F;background:black;min-height:250px}
+        #result-box{background:#2a2a2a;padding:20px;border-radius:15px;margin:15px 0}
+        .meter{width:100%;height:20px;background:#444;border-radius:10px;overflow:hidden;margin:10px 0}
+        #meter-fill{width:0%;height:100%;background:linear-gradient(90deg,#4CAF50,#FFC107,#F44336);transition:0.5s}
+        #light{width:80px;height:80px;border-radius:50%;margin:15px auto;transition:0.3s}
+        .light-off{background:#555}.light-green{background:#4CAF50;box-shadow:0 0 20px #4CAF50}.light-red{background:#F44336;box-shadow:0 0 20px #F44336}
+        .buttons button{width:100%;padding:15px;margin:8px 0;font-size:16px;background:#D32F2F;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:bold}
+        #stopBtn{background:#F44336}.deleteBtn{background:#9C27B0}
+        .hidden{display:none}
+        #history{background:#2a2a2a;padding:15px;border-radius:15px;margin-top:15px;text-align:right}
+        .history-item{background:#333;padding:10px;border-radius:10px;margin:10px 0}
+        .history-item video{border-radius:8px;margin-top:8px;width:100%}
+        #error{color:red;font-size:12px;margin:10px}
+    </style>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#D32F2F">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>TruthScan AI</h1>
-            <p>Stress Level Detector - صرف تفریح کے لیے</p>
-        </header>
-
-        <div id="disclaimer">
-            <b>نوٹ:</b> یہ ایپ عدالت میں ثبوت نہیں ہے۔ یہ صرف Stress چیک کرتی ہے۔
-        </div>
-
-        <div class="camera-box">
-            <video id="video" autoplay muted playsinline></video>
-        </div>
-        <p id="error" style="color:red; font-size:12px;"></p>
-
+        <header><h1>TruthScan AI</h1><p>Stress Level Detector - صرف تفریح کے لیے</p></header>
+        <div id="disclaimer"><b>نوٹ:</b> یہ ایپ عدالت میں ثبوت نہیں ہے۔ یہ صرف Stress چیک کرتی ہے۔</div>
+        <div class="camera-box"><video id="video" autoplay muted playsinline></video></div>
+        <p id="error"></p>
         <div id="result-box">
             <h2 id="status">اسکین شروع کریں</h2>
-            <div class="meter">
-                <div id="meter-fill"></div>
-            </div>
+            <div class="meter"><div id="meter-fill"></div></div>
             <p id="score">Stress: 0%</p>
             <div id="light" class="light-off"></div>
         </div>
-
         <div class="buttons">
             <button id="startBtn" onclick="startTest()">ٹیسٹ شروع کریں</button>
             <button id="stopBtn" onclick="stopTest()" class="hidden">ٹیسٹ روکیں</button>
             <button onclick="showHistory()">پچھلے رزلٹ دیکھیں</button>
         </div>
-
-        <div id="history" class="hidden">
-            <h3>پچھلے رزلٹ</h3>
-            <div id="history-list"></div>
-        </div>
+        <div id="history" class="hidden"><h3>پچھلے رزلٹ</h3><div id="history-list"></div></div>
     </div>
-    <script src="script.js"></script>
+
+<script>
+let video = document.getElementById('video');
+let isScanning = false; let stressScore = 0; let mediaRecorder; let recordedChunks = []; let stream;
+let errorP = document.getElementById('error');
+
+async function startTest(){
+    errorP.innerText = "";
+    document.getElementById('startBtn').classList.add('hidden');
+    document.getElementById('stopBtn').classList.remove('hidden');
+    document.getElementById('status').innerText = "ریکارڈنگ ہو رہی ہے... بولیں";
+
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        video.srcObject = stream;
+    } catch(err){
+        errorP.innerText = "Error: کیمرہ/مائک کی اجازت دیں۔ لاک 🔒 > Site Settings > Allow کریں";
+        return;
+    }
+
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+    mediaRecorder.onstop = saveResult;
+    mediaRecorder.start();
+    isScanning = true; scanLoop();
+}
+
+function scanLoop(){
+    if(!isScanning) return;
+    stressScore = Math.min(100, Math.max(0, 30 + Math.random() * 60));
+    document.getElementById('score').innerText = `Stress: ${stressScore.toFixed(0)}%`;
+    document.getElementById('meter-fill').style.width = stressScore + '%';
+    let light = document.getElementById('light'); let status = document.getElementById('status');
+    if(stressScore < 40){light.className='light-green';status.innerText='Calm - سچ بولنے کے چانس زیادہ';} 
+    else if(stressScore < 70){light.className='light-off';status.innerText='Nervous - کنفیوز';} 
+    else {light.className='light-red';status.innerText='High Stress - جھوٹ کے چانس زیادہ';}
+    setTimeout(scanLoop, 600);
+}
+
+function stopTest(){
+    isScanning = false; if(mediaRecorder) mediaRecorder.stop(); if(stream) stream.getTracks().forEach(track => track.stop());
+    document.getElementById('startBtn').classList.remove('hidden'); document.getElementById('stopBtn').classList.add('hidden');
+    document.getElementById('status').innerText = "ٹیسٹ مکمل۔ رزلٹ سیو ہو گیا";
+}
+
+function saveResult(){
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const videoURL = URL.createObjectURL(blob); const timestamp = new Date().toLocaleString('ur-PK'); const id = Date.now();
+    let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
+    history.push({ id:id, date:timestamp, score:stressScore.toFixed(0), video:videoURL });
+    localStorage.setItem('truthscan_history', JSON.stringify(history));
+    const a = document.createElement('a'); a.href = videoURL; a.download = `TruthScan_${id}.webm`; a.click();
+}
+
+function showHistory(){
+    let historyDiv = document.getElementById('history'); historyDiv.classList.toggle('hidden');
+    let listDiv = document.getElementById('history-list'); let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
+    if(history.length === 0){listDiv.innerHTML = "<p>کوئی رزلٹ نہیں</p>"; return;}
+    listDiv.innerHTML = ''; history.reverse().forEach(item => {
+        listDiv.innerHTML += `
+            <div class="history-item">
+                <p><b>تاریخ:</b> ${item.date}</p>
+                <p><b>Stress:</b> ${item.score}%</p>
+                <video src="${item.video}" controls></video>
+                <button class="deleteBtn" onclick="deleteItem(${item.id})">یہ ریکارڈ ڈیلیٹ کریں</button>
+            </div>`;
+    });
+}
+
+// نیا Delete فنکشن
+function deleteItem(id){
+    if(confirm("کیا آپ یہ ریکارڈ ڈیلیٹ کرنا چاہتے ہیں؟")){
+        let history = JSON.parse(localStorage.getItem('truthscan_history') || '[]');
+        history = history.filter(item => item.id !== id);
+        localStorage.setItem('truthscan_history', JSON.stringify(history));
+        showHistory(); // لسٹ ریفریش
+    }
+}
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
+</script>
 </body>
-</html>
+        </html>
